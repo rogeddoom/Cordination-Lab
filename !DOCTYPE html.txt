@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Coordination Lab | Pro Mechanic Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap');
+        body { background-color: #050505; color: #e5e5e5; touch-action: none; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+        canvas { display: block; touch-action: none; background: #000; }
+        .game-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); background: rgba(24, 24, 27, 0.6); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .game-card:hover { transform: translateY(-8px); border-color: #ef4444; background: rgba(39, 39, 42, 0.8); box-shadow: 0 10px 30px -10px rgba(239, 68, 68, 0.3); }
+        #center-dot { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background-color: #ff0000; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 100; box-shadow: 0 0 8px #ff0000; display: none; border: 1px solid rgba(255, 255, 255, 0.5); }
+        .font-mono-custom { font-family: 'JetBrains Mono', monospace; }
+        input[type=range] { accent-color: #ef4444; height: 6px; border-radius: 5px; }
+        .mobile-btn { -webkit-tap-highlight-color: transparent; user-select: none; }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+    <header class="p-4 flex justify-between items-center bg-black border-b border-white/5 z-30">
+        <div class="cursor-pointer select-none" onclick="showLobby()">
+            <h1 class="text-xl font-black tracking-tighter text-red-500">COORDINATION LAB</h1>
+        </div>
+        <div id="game-stats" class="hidden flex gap-8 items-center">
+            <div class="text-right">
+                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest">Points</p>
+                <p id="score-val" class="font-mono-custom text-2xl text-white">0</p>
+            </div>
+            <button onclick="showLobby()" class="bg-white/5 px-4 py-2 rounded-lg text-[10px] font-black tracking-widest border border-white/10 uppercase">Quit</button>
+        </div>
+    </header>
+
+    <main class="flex-grow relative overflow-hidden">
+        <div id="center-dot"></div>
+        <div id="lobby" class="absolute inset-0 z-20 bg-[#050505] overflow-y-auto p-8 flex flex-col items-center">
+            <div class="text-center mb-12 mt-10">
+                <h2 class="text-6xl font-black text-white mb-3 italic tracking-tighter uppercase">Mechanics Lab</h2>
+            </div>
+            <div class="bg-zinc-900/80 border border-white/10 p-6 rounded-3xl mb-10 w-full max-w-xl backdrop-blur-md">
+                <div class="flex justify-between items-center mb-4">
+                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sens (3D Mode)</label>
+                    <span id="sens-display" class="text-lg text-red-500 font-mono-custom">1.0</span>
+                </div>
+                <input type="range" id="sens-slider" min="0.1" max="5.0" step="0.1" value="1.0" class="w-full cursor-pointer">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-7xl">
+                <div onclick="initGame('aim')" class="game-card p-8 rounded-3xl cursor-pointer">
+                    <h3 class="text-xl font-black text-white uppercase mb-2">Reflex Aim</h3>
+                    <p class="text-gray-500 text-xs">Flick-shot training.</p>
+                </div>
+                <div onclick="initGame('track')" class="game-card p-8 rounded-3xl cursor-pointer border-red-500/40 border-2">
+                    <h3 class="text-xl font-black text-white uppercase mb-2">3D Voxel Track</h3>
+                    <p class="text-gray-500 text-xs">Full FPS rotation logic.</p>
+                </div>
+                <div onclick="initGame('flappy')" class="game-card p-8 rounded-3xl cursor-pointer">
+                    <h3 class="text-xl font-black text-white uppercase mb-2">Vertical</h3>
+                    <p class="text-gray-500 text-xs">Rhythm training.</p>
+                </div>
+                <div onclick="initGame('geo')" class="game-card p-8 rounded-3xl cursor-pointer">
+                    <h3 class="text-xl font-black text-white uppercase mb-2">Flow Dash</h3>
+                    <p class="text-gray-500 text-xs">Processing speed.</p>
+                </div>
+            </div>
+        </div>
+        <canvas id="gameCanvas" class="hidden"></canvas>
+        <div id="mobile-ui" class="hidden absolute inset-0 pointer-events-none z-10 flex items-end justify-end p-10">
+            <button id="mobile-action" class="mobile-btn pointer-events-auto w-24 h-24 bg-white/5 border-2 border-white/10 rounded-full flex items-center justify-center backdrop-blur-xl active:bg-red-500/40 transition-all md:hidden">
+                <span class="text-[10px] font-black text-white uppercase">Tap</span>
+            </button>
+        </div>
+        <div id="death-screen" class="hidden absolute inset-0 bg-black/95 z-40 flex flex-col items-center justify-center p-8 text-center">
+            <h2 class="text-6xl font-black text-red-600 mb-2 italic uppercase">Finished</h2>
+            <p id="final-stats" class="text-gray-500 font-mono-custom mb-10 text-sm tracking-widest">RESULT: 0</p>
+            <div class="flex gap-4">
+                <button onclick="restartGame()" class="px-10 py-4 bg-red-600 text-white font-black rounded-xl uppercase text-xs">Restart</button>
+                <button onclick="showLobby()" class="px-10 py-4 bg-white/5 text-white font-black rounded-xl border border-white/10 uppercase text-xs">Lobby</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const lobby = document.getElementById('lobby');
+        const statsUI = document.getElementById('game-stats');
+        const scoreEl = document.getElementById('score-val');
+        const centerDot = document.getElementById('center-dot');
+        const mobileUI = document.getElementById('mobile-ui');
+        const deathScreen = document.getElementById('death-screen');
+        const finalStats = document.getElementById('final-stats');
+        const sensSlider = document.getElementById('sens-slider');
+        const sensDisplay = document.getElementById('sens-display');
+
+        let currentGame = null, score = 0, difficulty = 1, animationFrame, lastMode = 'aim';
+        let yaw = 0, pitch = 0, baseSens = 0.002, mouseSens = 1.0, voxels = [], bot = { x: 0, y: 0, z: 500, angle: 0, size: 35 };
+
+        const state = {
+            aim: { targets: [], baseR: 45 },
+            flappy: { y: 0, v: 0, pipes: [], gap: 200, frame: 0 },
+            geo: { y: 0, v: 0, obs: [], frame: 0 }
+        };
+
+        for(let i=0; i<60; i++) voxels.push({ x: (Math.random()-0.5)*4000, y: (Math.random()-0.5)*3000, z: Math.random()*3000, s: 30 + Math.random()*80 });
+
+        sensSlider.oninput = (e) => { mouseSens = parseFloat(e.target.value); sensDisplay.innerText = mouseSens.toFixed(1); };
+
+        function showLobby() { currentGame = null; cancelAnimationFrame(animationFrame); lobby.classList.remove('hidden'); canvas.classList.add('hidden'); statsUI.classList.add('hidden'); centerDot.style.display = 'none'; mobileUI.classList.add('hidden'); deathScreen.classList.add('hidden'); }
+
+        function initGame(type) {
+            lastMode = type; currentGame = type; score = 0; difficulty = 1; scoreEl.innerText = '0';
+            lobby.classList.add('hidden'); canvas.classList.remove('hidden'); statsUI.classList.remove('hidden'); deathScreen.classList.add('hidden');
+            resize();
+            if (type === 'track') { canvas.requestPointerLock?.(); centerDot.style.display = 'block'; yaw = 0; pitch = 0; }
+            else if (type === 'flappy' || type === 'geo') { mobileUI.classList.remove('hidden'); state[type].y = type==='flappy'?canvas.height/2:0; state[type].v = 0; state[type].frame = 0; if(type==='flappy') state.flappy.pipes = []; else state.geo.obs = []; }
+            else { state.aim.targets = []; spawnAimTarget(); }
+            gameLoop();
+        }
+
+        function spawnAimTarget() { let r = Math.max(8, state.aim.baseR - (difficulty * 2.5)); state.aim.targets = [{ x: r + Math.random() * (canvas.width - r*2), y: r + Math.random() * (canvas.height - r*2), r: r }]; }
+        function triggerAction() { if(currentGame === 'flappy') state.flappy.v = -8; if(currentGame === 'geo' && state.geo.y === 0) state.geo.v = 14; }
+        window.onkeydown = (e) => { if(e.code === 'Space') triggerAction(); };
+        document.getElementById('mobile-action').ontouchstart = (e) => { e.preventDefault(); triggerAction(); };
+        canvas.onmousedown = (e) => {
+            if(currentGame === 'aim') {
+                const rect = canvas.getBoundingClientRect();
+                const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+                const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+                const t = state.aim.targets[0];
+                if(t && Math.hypot(mx - t.x, my - t.y) < t.r) { score += 100; scoreEl.innerText = score; difficulty += 0.25; spawnAimTarget(); }
+            } else if (currentGame === 'track' && !document.pointerLockElement) canvas.requestPointerLock?.();
+            else triggerAction();
+        };
+
+        window.onmousemove = (e) => { if(currentGame === 'track' && document.pointerLockElement === canvas) { yaw -= e.movementX * baseSens * mouseSens; pitch -= e.movementY * baseSens * mouseSens; pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch)); } };
+
+        function project(x, y, z, w, h) {
+            let dx = x * Math.cos(yaw) - z * Math.sin(yaw);
+            let dz = x * Math.sin(yaw) + z * Math.cos(yaw);
+            let dy = y - (dz * Math.tan(pitch)); 
+            if (dz <= 10) return null; 
+            return { x: (dx / dz) * (w / 2) + (w / 2), y: (dy / dz) * (h / 2) + (h / 2), size: (1 / dz) * (w / 2), dz: dz };
+        }
+
+        function gameOver() { currentGame = null; if(document.pointerLockElement) document.exitPointerLock(); deathScreen.classList.remove('hidden'); mobileUI.classList.add('hidden'); centerDot.style.display = 'none'; finalStats.innerText = `RESULT: ${score}`; }
+        function restartGame() { initGame(lastMode); }
+        function resize() { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; }
+        window.onresize = resize;
+
+        function gameLoop() {
+            if(!currentGame) return;
+            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+            if(currentGame === 'aim') { const t = state.aim.targets[0]; if(t) { ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI*2); ctx.fill(); } }
+            if(currentGame === 'flappy') {
+                const s = state.flappy; s.v += 0.45; s.y += s.v; s.frame++;
+                if(s.frame % 90 === 0) { const g = Math.max(110, 210 - (difficulty*5)); const p = 50 + Math.random() * (h - g - 100); s.pipes.push({ x: w, t: p, b: p + g }); }
+                ctx.fillStyle = '#ef4444'; ctx.fillRect(w*0.2, s.y, 40, 40);
+                s.pipes.forEach((p, i) => {
+                    p.x -= 5; ctx.fillStyle = '#18181b'; ctx.fillRect(p.x, 0, 70, p.t); ctx.fillRect(p.x, p.b, 70, h);
+                    if(p.x < w*0.2+40 && p.x+70 > w*0.2 && (s.y < p.t || s.y+40 > p.b)) gameOver();
+                    if(Math.abs(p.x - w*0.2) < 5) { score++; scoreEl.innerText = score; }
+                });
+                if(s.y > h || s.y < 0) gameOver();
+            }
+            if(currentGame === 'geo') {
+                const s = state.geo; s.v -= 0.7; s.y += s.v; if(s.y < 0) { s.y = 0; s.v = 0; } s.frame++;
+                if(s.frame % 60 === 0) s.obs.push({ x: w });
+                ctx.fillStyle = '#ef4444'; ctx.fillRect(w*0.2-20, h-100-s.y-40, 40, 40);
+                s.obs.forEach((o, i) => { o.x -= 8; ctx.fillStyle = '#444'; ctx.beginPath(); ctx.moveTo(o.x, h-100); ctx.lineTo(o.x+20, h-150); ctx.lineTo(o.x+40, h-100); ctx.fill(); if(o.x < w*0.2+20 && o.x+40 > w*0.2-20 && s.y < 45) gameOver(); });
+                score = Math.floor(s.frame/10); scoreEl.innerText = score;
+            }
+            if(currentGame === 'track') {
+                voxels.forEach(v => { const p = project(v.x, v.y, v.z, w, h); if(p) { const sz = v.s * p.size * 0.05; ctx.fillStyle = `rgba(50, 50, 50, ${Math.min(1, 500/p.dz)})`; ctx.fillRect(p.x - sz/2, p.y - sz/2, sz, sz); } });
+                bot.angle += 0.02; bot.x = Math.sin(bot.angle)*350; bot.y = Math.cos(bot.angle*0.6)*180;
+                const bp = project(bot.x, bot.y, bot.z, w, h);
+                if(bp) {
+                    const bsz = bot.size * bp.size * 0.05; ctx.fillStyle = '#ef4444'; ctx.fillRect(bp.x - bsz/2, bp.y - bsz/2, bsz, bsz);
+                    if(Math.hypot(bp.x - w/2, bp.y - h/2) < bsz/1.5) { score++; scoreEl.innerText = Math.floor(score/5); centerDot.style.backgroundColor = '#00ff00'; }
+                    else centerDot.style.backgroundColor = '#ff0000';
+                }
+            }
+            animationFrame = requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
